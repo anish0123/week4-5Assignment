@@ -1,4 +1,4 @@
-# SSSF week 4+5 exercise. Submit to Oma
+# SSSF week 4+5 exercise.
 
 Add authentication and brute force prevention to last weeks assignment.
 
@@ -11,11 +11,6 @@ Add authentication and brute force prevention to last weeks assignment.
 - `npm i` to install dependencies
 - `npm run dev` to start development server
 - `npm run test` to run tests
-
-## Assignment
-
-- Your task is to complete all TODOs in the code until all tests are passed
-- TODOs are located in resolvers and app.ts
 
 ### Types
 
