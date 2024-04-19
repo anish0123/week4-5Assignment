@@ -1,19 +1,8 @@
 import {GraphQLError} from 'graphql';
-import catModel from '../models/catModel';
-import {
-  Cat,
-  LocationInput,
-  TokenContent,
-  coordinates,
-} from '../../types/DBTypes';
-import mongoose from 'mongoose';
-import {Point} from 'geojson';
+import {Cat, coordinates} from '../../types/DBTypes';
 import {MyContext} from '../../types/MyContext';
+import catModel from '../models/catModel';
 
-// TODO: create resolvers based on cat.graphql
-// note: when updating or deleting a cat, you need to check if the user is the owner of the cat
-// note2: when updating or deleting a cat as admin, you need to check if the user is an admin by checking the role from the user object
-// note3: updating and deleting resolvers should be the same for users and admins. Use if statements to check if the user is the owner or an admin
 export default {
   Query: {
     cats: async () => {
@@ -62,29 +51,16 @@ export default {
   Mutation: {
     createCat: async (
       _parent: undefined,
-      args: {
-        cat_name: String;
-        weight: Number;
-        birthdate: Date;
-        owner: mongoose.Schema.Types.ObjectId;
-        location: Point;
-        filename: String;
-      },
+      args: {input: Omit<Cat, '_id'>},
       context: MyContext,
-    ): Promise<Cat> => {
+    ) => {
       if (!context.userdata) {
         throw new GraphQLError('User not authenticated', {
           extensions: {code: 'UNAUTHENTICATED'},
         });
       }
-      const newCat = await catModel.create({
-        cat_name: args.cat_name,
-        weight: args.weight,
-        birthdate: args.birthdate,
-        owner: args.owner,
-        location: args.location,
-        filename: args.filename,
-      });
+      args.input.owner = context.userdata.user._id;
+      const newCat = await catModel.create(args.input);
       if (!newCat) {
         throw new Error('Error creating cat');
       }
@@ -94,12 +70,7 @@ export default {
       _parent: undefined,
       args: {
         id: string;
-        cat_name?: String;
-        weight?: Number;
-        birthdate?: Date;
-        owner?: mongoose.Schema.Types.ObjectId;
-        location?: Point;
-        filename: String;
+        input: Omit<Cat, '_id'>;
       },
       context: MyContext,
     ): Promise<Cat> => {
@@ -108,20 +79,13 @@ export default {
           extensions: {code: 'UNAUTHENTICATED'},
         });
       }
-      const updatedCat = await catModel.findByIdAndUpdate(
-        args.id,
-        {
-          cat_name: args.cat_name,
-          weight: args.weight,
-          birthdate: args.birthdate,
-          owner: args.owner,
-          location: args.location,
-          filename: args.filename,
-        },
-        {
-          new: true,
-        },
-      );
+      const filter = {_id: args.id, owner: context.userdata.user._id};
+      if (context.userdata.user.role === 'admin') {
+        delete filter.owner;
+      }
+      const updatedCat = await catModel.findOneAndUpdate(filter, args.input, {
+        new: true,
+      });
       if (!updatedCat) {
         throw new Error('Cat not found');
       }
@@ -137,7 +101,11 @@ export default {
           extensions: {code: 'UNAUTHENTICATED'},
         });
       }
-      const deletedCat = await catModel.findByIdAndDelete(args.id);
+      const filter = {_id: args.id, owner: context.userdata.user._id};
+      if (context.userdata.user.role === 'admin') {
+        delete filter.owner;
+      }
+      const deletedCat = await catModel.findOneAndDelete(filter);
       if (!deletedCat) {
         throw new Error('Cat not found');
       }

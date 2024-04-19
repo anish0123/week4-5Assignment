@@ -168,7 +168,6 @@ const loginUser = (
           reject(err);
         } else {
           const user = vars.credentials;
-          console.log('login response', response.body);
           const userData = response.body.data.login;
           expect(userData).toHaveProperty('message');
           expect(userData).toHaveProperty('token');
@@ -351,7 +350,6 @@ const adminDeleteUser = (
         } else {
           const userData = response.body.data.deleteUserAsAdmin;
           expect(userData.user.id).toBe(id);
-          console.log('delete user as admin', userData);
           resolve(userData);
         }
       });

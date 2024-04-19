@@ -13,12 +13,12 @@ import {
 } from '@apollo/server/plugin/landingPage/default';
 import {notFound, errorHandler} from './middlewares';
 import authenticate from './functions/authenticate';
-// import {createRateLimitRule} from 'graphql-rate-limit';
-// import {shield} from 'graphql-shield';
 import {makeExecutableSchema} from '@graphql-tools/schema';
 import {applyMiddleware} from 'graphql-middleware';
 import {MyContext} from './types/MyContext';
-import {GraphQLError} from 'graphql';
+import {createRateLimitRule} from 'graphql-rate-limit';
+import {shield} from 'graphql-shield';
+import {constraintDirectiveTypeDefs} from 'graphql-constraint-directive';
 
 const app = express();
 
@@ -31,17 +31,23 @@ app.use(
 
 (async () => {
   try {
-    // TODO Create a rate limit rule instance (not WSK2 course)
+    const rateLimitRule = createRateLimitRule({
+      identifyContext: (ctx) => {
+        return ctx.userdata?._id ? ctx.userdata._id : ctx.id;
+      },
+    });
+    const permissions = shield({
+      Mutation: {
+        login: rateLimitRule({max: 5, window: '10s'}),
+      },
+    });
 
-    // TODO Create a permissions object (not WSK2 course)
+    const executableSchema = makeExecutableSchema({
+      typeDefs: [constraintDirectiveTypeDefs, typeDefs],
+      resolvers,
+    });
 
-    const schema = applyMiddleware(
-      makeExecutableSchema({
-        typeDefs,
-        resolvers,
-      }),
-      // permissions,
-    );
+    const schema = applyMiddleware(executableSchema, permissions);
 
     const server = new ApolloServer<MyContext>({
       schema,

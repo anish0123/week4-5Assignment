@@ -1,19 +1,8 @@
 import {GraphQLError} from 'graphql';
-import {
-  Cat,
-  LoginUser,
-  TokenContent,
-  User,
-  UserInput,
-  UserOutput,
-} from '../../types/DBTypes';
+import {Cat, LoginUser, User, UserInput, UserOutput} from '../../types/DBTypes';
 import fetchData from '../../functions/fetchData';
 import {LoginResponse, UserResponse} from '../../types/MessageTypes';
-import { MyContext } from '../../types/MyContext';
-
-// TODO: create resolvers based on user.graphql
-// note: when updating or deleting a user don't send id to the auth server, it will get it from the token. So token needs to be sent with the request to the auth server
-// note2: when updating or deleting a user as admin, you need to send user id (dont delete admin btw) and also check if the user is an admin by checking the role from the user object form context
+import {MyContext} from '../../types/MyContext';
 
 export default {
   Cat: {
@@ -98,6 +87,79 @@ export default {
       >(process.env.AUTH_URL + '/auth/login', options);
       loginResponse.user.id = loginResponse.user._id;
       return loginResponse;
+    },
+    updateUser: async (
+      _parent: undefined,
+      args: {user: UserInput},
+      context: MyContext,
+    ): Promise<UserResponse> => {
+      if (!context.userdata) {
+        throw new GraphQLError('User not authenticated', {
+          extensions: {code: 'UNAUTHENTICATED'},
+        });
+      }
+      const options = {
+        method: 'PUT',
+        headers: {
+          'CONTENT-TYPE': 'application/json',
+          Authorization: 'Bearer ' + context.userdata.token,
+        },
+        body: JSON.stringify(args.user),
+      };
+      const user = await fetchData<UserResponse>(
+        process.env.AUTH_URL + '/users',
+        options,
+      );
+      return user;
+    },
+    deleteUser: async (
+      _parent: undefined,
+      _args: undefined,
+      context: MyContext,
+    ): Promise<UserResponse> => {
+      if (!context.userdata) {
+        throw new GraphQLError('User not authenticated', {
+          extensions: {code: 'UNAUTHENTICATED'},
+        });
+      }
+      const options = {
+        method: 'DELETE',
+        headers: {
+          Authorization: 'Bearer ' + context.userdata.token,
+        },
+      };
+      const user = await fetchData<UserResponse>(
+        process.env.AUTH_URL + '/users',
+        options,
+      );
+      return user;
+    },
+    deleteUserAsAdmin: async (
+      _parent: undefined,
+      args: {id: string},
+      context: MyContext,
+    ): Promise<UserResponse> => {
+      if (!context.userdata) {
+        throw new GraphQLError('User not authenticated', {
+          extensions: {code: 'UNAUTHENTICATED'},
+        });
+      }
+      if (context.userdata.user.role !== 'admin') {
+        throw new GraphQLError('User not authorized', {
+          extensions: {code: 'UNAUTHORIZED'},
+        });
+      }
+      const options = {
+        method: 'DELETE',
+        headers: {
+          Authorization: 'Bearer ' + context.userdata.token,
+        },
+      };
+      const user = await fetchData<UserResponse>(
+        process.env.AUTH_URL + `/users/${args.id}`,
+        options,
+      );
+      return user;
     },
   },
 };
